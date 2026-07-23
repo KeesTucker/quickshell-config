@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# omarchy:summary=Prints current network status as JSON for the Quickshell bar's Network module (bar/components/Network.qml).
+
+set -euo pipefail
+
+ethernet_dev=$(nmcli -t -f DEVICE,TYPE,STATE device status | awk -F: '$2 == "ethernet" && $3 == "connected" { print $1; exit }')
+if [[ -n $ethernet_dev ]]; then
+  jq -nc '{state: "ethernet"}'
+  exit 0
+fi
+
+wifi_dev=$(nmcli -t -f DEVICE,TYPE,STATE device status | awk -F: '$2 == "wifi" && $3 == "connected" { print $1; exit }')
+if [[ -n $wifi_dev ]]; then
+  signal=$(nmcli -g active,signal device wifi list ifname "$wifi_dev" 2>/dev/null | awk -F: '$1 == "yes" { print $2; exit }')
+  essid=$(nmcli -g GENERAL.CONNECTION device show "$wifi_dev" 2>/dev/null)
+  jq -nc --arg essid "$essid" --argjson signal "${signal:-0}" '{state: "wifi", signal: $signal, essid: $essid}'
+  exit 0
+fi
+
+jq -nc '{state: "disconnected"}'
